@@ -19,6 +19,9 @@ export type MedicationSummary = Medication & {
   /** Tomas pendientes cuya hora ya pasó. */
   overdue: number;
   next_at: number | null;
+  /** Tomas de este medicamento programadas para hoy y cuántas ya se registraron. */
+  today_total: number;
+  today_taken: number;
 };
 
 export type TakenDose = {
@@ -60,6 +63,8 @@ const DOSE_SELECT = `
 
 export async function listMedications(now = Date.now()): Promise<MedicationSummary[]> {
   const db = await getDb();
+  const dayStart = new Date(now);
+  dayStart.setHours(0, 0, 0, 0);
   return db.getAllAsync<MedicationSummary>(
     `SELECT m.*,
       (SELECT COUNT(*) FROM doses WHERE medication_id = m.id) AS total,
@@ -68,11 +73,27 @@ export async function listMedications(now = Date.now()): Promise<MedicationSumma
          AND COALESCE(snoozed_until, scheduled_at) <= ?) AS overdue,
       (SELECT MIN(COALESCE(snoozed_until, scheduled_at)) FROM doses
          WHERE medication_id = m.id AND status = 'pending'
-           AND COALESCE(snoozed_until, scheduled_at) > ?) AS next_at
+           AND COALESCE(snoozed_until, scheduled_at) > ?) AS next_at,
+      (SELECT COUNT(*) FROM doses WHERE medication_id = m.id
+         AND scheduled_at >= ? AND scheduled_at < ?) AS today_total,
+      (SELECT COUNT(*) FROM doses WHERE medication_id = m.id AND status = 'taken'
+         AND scheduled_at >= ? AND scheduled_at < ?) AS today_taken
     FROM medications m
     ORDER BY m.created_at DESC`,
-    now, now,
+    now, now, dayStart.getTime(), dayStart.getTime() + DAY, dayStart.getTime(), dayStart.getTime() + DAY,
   );
+}
+
+/** Próxima toma pendiente de un medicamento (la que aún no suena), para poder adelantarla. */
+export async function getNextPendingDoseId(medicationId: number, now = Date.now()): Promise<number | null> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{ id: number }>(
+    `SELECT id FROM doses WHERE medication_id = ? AND status = 'pending'
+       AND COALESCE(snoozed_until, scheduled_at) > ?
+     ORDER BY COALESCE(snoozed_until, scheduled_at) LIMIT 1`,
+    medicationId, now,
+  );
+  return row?.id ?? null;
 }
 
 /** Tomas registradas, más recientes primero. */
@@ -113,7 +134,8 @@ export async function getMedication(id: number): Promise<Medication | null> {
   return db.getFirstAsync<Medication>('SELECT * FROM medications WHERE id = ?', id);
 }
 
-export async function createMedication(input: MedicationInput): Promise<number> {
+/** Con `takeFirstNow` la primera toma queda registrada como tomada en este momento. */
+export async function createMedication(input: MedicationInput, takeFirstNow = false): Promise<number> {
   const db = await getDb();
   let id = 0;
   await db.withExclusiveTransactionAsync(async (txn) => {
@@ -125,6 +147,13 @@ export async function createMedication(input: MedicationInput): Promise<number> 
     id = res.lastInsertRowId;
     for (const t of buildSchedule(input.startAt, input.intervalMinutes, input.days)) {
       await txn.runAsync('INSERT INTO doses (medication_id, scheduled_at) VALUES (?, ?)', id, t);
+    }
+    if (takeFirstNow) {
+      await txn.runAsync(
+        `UPDATE doses SET status = 'taken', taken_at = ?
+         WHERE id = (SELECT id FROM doses WHERE medication_id = ? ORDER BY scheduled_at LIMIT 1)`,
+        Date.now(), id,
+      );
     }
   });
   return id;
@@ -207,11 +236,11 @@ export async function snoozeDose(id: number): Promise<number> {
  * por la diferencia entre la hora real y la programada, de modo que la próxima
  * quede a un intervalo completo desde ahora; si no, se mantienen los horarios originales.
  */
-export async function markTaken(id: number, redefine: boolean): Promise<void> {
+export async function markTaken(id: number, redefine: boolean, takenAt = Date.now()): Promise<void> {
   const db = await getDb();
   const dose = await getDose(id);
   if (!dose || dose.status === 'taken') return;
-  const now = Date.now();
+  const now = takenAt;
   await db.withExclusiveTransactionAsync(async (txn) => {
     await txn.runAsync(
       "UPDATE doses SET status = 'taken', taken_at = ?, snoozed_until = NULL WHERE id = ?",
@@ -225,6 +254,15 @@ export async function markTaken(id: number, redefine: boolean): Promise<void> {
       );
     }
   });
+}
+
+/** Deshace una toma registrada por error: vuelve a quedar pendiente. */
+export async function undoTaken(id: number): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(
+    "UPDATE doses SET status = 'pending', taken_at = NULL, snoozed_until = NULL WHERE id = ? AND status = 'taken'",
+    id,
+  );
 }
 
 // ---- Recetas: citas médicas y sus fotos ----

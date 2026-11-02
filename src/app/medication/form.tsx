@@ -11,6 +11,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -29,7 +30,7 @@ import { rescheduleAll } from '../../lib/notifications';
 import { deletePhoto, persistPhoto } from '../../lib/photos';
 import { useScrollToFocused } from '../../lib/useScrollToFocused';
 import { useStyles, useTheme, type Palette } from '../../lib/theme';
-import { MINUTE, buildSchedule, formatInterval, formatShortDate } from '../../lib/time';
+import { MINUTE, buildSchedule, formatInterval, formatShortDate, formatTime } from '../../lib/time';
 
 type InputRef = ComponentRef<typeof TextInput>;
 
@@ -57,6 +58,7 @@ export default function MedicationForm() {
   const [minutes, setMinutes] = useState('0');
   const [days, setDays] = useState('7');
   const [startAt, setStartAt] = useState(nextRoundedStart);
+  const [takeNow, setTakeNow] = useState(false);
   const [saving, setSaving] = useState(false);
   const [focused, setFocused] = useState(0);
   const [recipes, setRecipes] = useState<Appointment[]>([]);
@@ -127,14 +129,14 @@ export default function MedicationForm() {
         dosage: dosage.trim(),
         photoUri: finalPhoto,
         intervalMinutes,
-        startAt,
+        startAt: takeNow && !editingId ? Date.now() : startAt,
         days: dayCount,
       };
       if (editingId) {
         await updateMedication(editingId, input);
         if (originalPhoto && originalPhoto !== finalPhoto) deletePhoto(originalPhoto);
       } else {
-        await createMedication(input);
+        await createMedication(input, takeNow);
       }
       await rescheduleAll();
       router.back();
@@ -275,7 +277,24 @@ export default function MedicationForm() {
             </View>
 
             <Text style={styles.label}>Primera toma</Text>
-            <DateTimeField value={startAt} onChange={setStartAt} />
+            {!editingId && (
+              <View style={styles.nowRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.nowTitle}>Tomar la primera toma ahora</Text>
+                  <Text style={styles.hint}>Se registra como tomada y las siguientes cuentan desde este momento.</Text>
+                </View>
+                <Switch
+                  value={takeNow}
+                  onValueChange={setTakeNow}
+                  trackColor={{ true: colors.primary, false: colors.border }}
+                />
+              </View>
+            )}
+            {takeNow && !editingId ? (
+              <Text style={styles.nowAt}>Ahora · {formatTime(Date.now())}</Text>
+            ) : (
+              <DateTimeField value={startAt} onChange={setStartAt} />
+            )}
 
             {totalDoses > 0 && (
               <View style={styles.summary}>
@@ -377,6 +396,9 @@ const createStyles = (c: Palette, isDark: boolean) =>
       color: c.text,
     },
     row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    nowRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4 },
+    nowTitle: { fontSize: 15, fontWeight: '700', color: c.text },
+    nowAt: { fontSize: 15, fontWeight: '700', color: c.primary },
     short: { width: 64, textAlign: 'center' },
     unit: { fontSize: 14, color: c.text },
     summary: {

@@ -9,6 +9,7 @@ import { ScrollView, StyleSheet, Text, Vibration, View, useWindowDimensions } fr
 import { AdBanner } from '../components/AdBanner';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../components/Button';
+import { DateTimeField } from '../components/DateTimeField';
 import { getDose, getNextDose, markTaken, snoozeDose, type DoseWithMed } from '../db/repo';
 import { rescheduleAll, setActiveAlarmDose } from '../lib/notifications';
 import { useStyles, useTheme, type Palette } from '../lib/theme';
@@ -19,7 +20,7 @@ type Step = 'loading' | 'ring' | 'ask' | 'done' | 'missing';
 const alarmSound = require('../../assets/alarm.wav');
 
 export default function Alarm() {
-  const { doseId, ask } = useLocalSearchParams<{ doseId: string; ask?: string }>();
+  const { doseId, ask, pick } = useLocalSearchParams<{ doseId: string; ask?: string; pick?: string }>();
   const id = Number(doseId);
   const { width } = useWindowDimensions();
   const photoSize = Math.min(width - 48, 340);
@@ -52,7 +53,8 @@ export default function Alarm() {
 
   const startAsk = useCallback(async (current: DoseWithMed) => {
     const following = await getNextDose(current);
-    if (!following) {
+    // Con "Tomar ahora" (pick) siempre se pasa por la pantalla donde se puede indicar la hora real.
+    if (!following && pick !== '1') {
       await markTaken(current.id, false);
       await rescheduleAll();
       setStep('done');
@@ -61,7 +63,7 @@ export default function Alarm() {
     setNext(following);
     setTakenAt(Date.now());
     setStep('ask');
-  }, []);
+  }, [pick]);
 
   useEffect(() => {
     setActiveAlarmDose(id);
@@ -123,8 +125,13 @@ export default function Alarm() {
 
   const onChoose = async (redefine: boolean) => {
     setBusy(true);
-    await markTaken(id, redefine);
+    await markTaken(id, redefine, takenAt);
     await rescheduleAll();
+    if (!next) {
+      setBusy(false);
+      setStep('done');
+      return;
+    }
     close();
   };
 
@@ -155,15 +162,30 @@ export default function Alarm() {
     );
   }
 
-  if (step === 'ask' && next) {
-    const redefinedNext = next.scheduled_at + (takenAt - dose.scheduled_at);
+  if (step === 'ask') {
+    const redefinedNext = next ? next.scheduled_at + (takenAt - dose.scheduled_at) : 0;
     return (
       <ScrollView contentContainerStyle={[styles.container, styles.center]}>
         {statusBar}
         <Ionicons name="checkmark-circle" size={72} color={colors.success} />
         <Text style={styles.title}>Tomaste {dose.name}</Text>
-        <Text style={styles.sub}>¿Qué hacemos con los próximos horarios?</Text>
+        {pick === '1' && (
+          <View style={styles.option}>
+            <View style={styles.optionHead}>
+              <Ionicons name="time-outline" size={22} color={colors.primary} />
+              <Text style={styles.optionTitle}>¿A qué hora la tomaste?</Text>
+            </View>
+            <Text style={styles.optionText}>Déjalo así si fue ahora, o cámbialo si la tomaste antes.</Text>
+            <DateTimeField value={takenAt} onChange={(t) => setTakenAt(Math.min(t, Date.now()))} />
+          </View>
+        )}
+        {next ? (
+          <Text style={styles.sub}>¿Qué hacemos con los próximos horarios?</Text>
+        ) : (
+          <Button title="Registrar toma" onPress={() => onChoose(false)} disabled={busy} style={styles.fullWidth} />
+        )}
 
+        {next && (
         <View style={styles.option}>
           <View style={styles.optionHead}>
             <Ionicons name="calendar-outline" size={22} color={colors.primary} />
@@ -172,7 +194,9 @@ export default function Alarm() {
           <Text style={styles.optionText}>Próxima toma: {formatDateTime(next.scheduled_at)}</Text>
           <Button title="Mantener" variant="secondary" onPress={() => onChoose(false)} disabled={busy} />
         </View>
+        )}
 
+        {next && (
         <View style={styles.option}>
           <View style={styles.optionHead}>
             <Ionicons name="refresh-circle-outline" size={22} color={colors.primary} />
@@ -183,6 +207,7 @@ export default function Alarm() {
           </Text>
           <Button title="Redefinir" onPress={() => onChoose(true)} disabled={busy} />
         </View>
+        )}
       </ScrollView>
     );
   }

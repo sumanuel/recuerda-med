@@ -2,10 +2,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { ProgressBar } from '../../components/ProgressBar';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import {
+  getNextPendingDoseId,
   getTodayStats,
   listDueDoses,
   listMedications,
@@ -15,7 +16,21 @@ import {
 import { useGuide } from '../../lib/guide';
 import { hasExactAlarmPermission, requestExactAlarmPermission, rescheduleAll } from '../../lib/notifications';
 import { useStyles, useTheme, type Palette } from '../../lib/theme';
-import { formatDateTime, formatInterval, formatLongDate } from '../../lib/time';
+import { DAY, formatDateTime, formatInterval, formatLongDate } from '../../lib/time';
+
+/** Día del tratamiento (1 a N) según la fecha de la primera toma. */
+const dayOf = (m: MedicationSummary) =>
+  Math.min(m.days, Math.max(1, Math.floor((Date.now() - m.start_at) / DAY) + 1));
+
+/** Adelanta la próxima toma: pide confirmación y sigue con la pantalla de "Ya la tomé". */
+async function takeNow(m: MedicationSummary) {
+  const id = await getNextPendingDoseId(m.id);
+  if (!id) return;
+  Alert.alert('Tomar ahora', `Registrarás ${m.name} como tomada antes de que suene la alarma. En el siguiente paso puedes indicar la hora real en que la tomaste.`, [
+    { text: 'Cancelar', style: 'cancel' },
+    { text: 'Tomar ahora', onPress: () => router.push({ pathname: '/alarm', params: { doseId: String(id), ask: '1', pick: '1' } }) },
+  ]);
+}
 
 export default function Home() {
   const styles = useStyles(createStyles);
@@ -161,30 +176,54 @@ export default function Home() {
               <Text style={styles.name} numberOfLines={1}>
                 {item.name}
               </Text>
-              {!!item.dosage && (
-                <Text style={styles.muted} numberOfLines={1}>
+              <View style={styles.dosageRow}>
+                <Text style={[styles.field, { flex: 1 }]} numberOfLines={1}>
                   {item.dosage}
                 </Text>
-              )}
-              <View style={styles.chips}>
                 <View style={styles.chip}>
                   <Ionicons name="repeat" size={13} color={colors.primary} />
                   <Text style={styles.chipText}>Cada {formatInterval(item.interval_minutes)}</Text>
                 </View>
-                {item.overdue > 0 && (
+              </View>
+              {item.overdue > 0 && (
+                <View style={styles.chips}>
                   <View style={[styles.chip, { backgroundColor: colors.dangerSoft }]}>
                     <Text style={[styles.chipText, { color: colors.danger }]}>
                       {item.overdue} pendiente{item.overdue > 1 ? 's' : ''}
                     </Text>
                   </View>
-                )}
+                </View>
+              )}
+              <View style={styles.medTodayRow}>
+                <Text style={styles.fieldLabel}>Tomas de hoy</Text>
+                <Text style={styles.medTodayValue}>
+                  {item.today_total ? `${item.today_taken} de ${item.today_total}` : 'Sin tomas'}
+                </Text>
               </View>
               <ProgressBar
-                value={item.total ? item.taken / item.total : 0}
+                value={item.today_total ? item.today_taken / item.today_total : 0}
+                track={colors.surfaceAlt}
+                fill={colors.accent}
+                height={6}
+              />
+              <View style={styles.medTodayRow}>
+                <Text style={styles.fieldLabel}>Día</Text>
+                <Text style={styles.medTodayValue}>
+                  {dayOf(item)} de {item.days}
+                </Text>
+              </View>
+              <ProgressBar
+                value={dayOf(item) / item.days}
                 track={colors.surfaceAlt}
                 fill={colors.primary}
                 height={6}
               />
+              {!!item.next_at && (
+                <Pressable style={styles.takeNow} onPress={() => takeNow(item)} accessibilityLabel={`Tomar ${item.name} ahora`}>
+                  <Ionicons name="checkmark-circle-outline" size={16} color={colors.primary} />
+                  <Text style={styles.takeNowText}>Tomar ahora</Text>
+                </Pressable>
+              )}
               <View style={styles.cardFoot}>
                 <Text style={styles.next}>
                   {item.next_at ? `Próxima: ${formatDateTime(item.next_at)}` : item.overdue ? 'Toma pendiente' : 'Completado'}
@@ -208,6 +247,8 @@ const createStyles = (c: Palette, isDark: boolean) =>
     todayCard: { backgroundColor: 'rgba(255,255,255,0.14)', borderRadius: 16, padding: 14, gap: 10 },
     todayRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     todayLabel: { color: c.onHeader, opacity: 0.85, fontSize: 14, fontWeight: '600' },
+    medTodayRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    medTodayValue: { fontSize: 13, fontWeight: '800', color: c.text },
     todayValue: { color: c.onHeader, fontSize: 18, fontWeight: '800' },
     section: { fontSize: 14, fontWeight: '800', color: c.muted, letterSpacing: 0.6, textTransform: 'uppercase' },
     card: {
@@ -227,7 +268,22 @@ const createStyles = (c: Palette, isDark: boolean) =>
     thumb: { width: 76, height: 76, borderRadius: 16, backgroundColor: c.surfaceAlt },
     thumbEmpty: { alignItems: 'center', justifyContent: 'center' },
     name: { fontSize: 18, fontWeight: '800', color: c.text },
+    field: { fontSize: 14, fontWeight: '600', color: c.text },
+    takeNow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      borderWidth: 1.5,
+      borderColor: c.primary,
+      borderRadius: 10,
+      paddingVertical: 7,
+      marginTop: 2,
+    },
+    takeNowText: { fontSize: 14, fontWeight: '800', color: c.primary },
+    fieldLabel: { fontSize: 14, fontWeight: '500', color: c.muted },
     muted: { fontSize: 13, color: c.muted },
+    dosageRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
     chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
     chip: {
       flexDirection: 'row',

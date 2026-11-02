@@ -2,10 +2,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { ProgressBar } from '../../components/ProgressBar';
 import { ScreenHeader } from '../../components/ScreenHeader';
-import { listMedications, listTakenDoses, type MedicationSummary, type TakenDose } from '../../db/repo';
+import { listMedications, listTakenDoses, undoTaken, type MedicationSummary, type TakenDose } from '../../db/repo';
+import { rescheduleAll } from '../../lib/notifications';
 import { useStyles, useTheme, type Palette } from '../../lib/theme';
 import { DAY, MINUTE, formatInterval, formatShortDate, formatTime } from '../../lib/time';
 
@@ -28,6 +29,12 @@ export default function History() {
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
   const [shown, setShown] = useState<Record<number, number>>({});
 
+  const load = useCallback(async () => {
+    const [m, t] = await Promise.all([listMedications(), listTakenDoses()]);
+    setMeds(m);
+    setTaken(t);
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
@@ -41,6 +48,24 @@ export default function History() {
       };
     }, []),
   );
+
+  const undo = (d: TakenDose, name: string) =>
+    Alert.alert(
+      'Quitar esta toma',
+      `Se borrará el registro de ${name} del ${formatShortDate(d.taken_at)} a las ${formatTime(d.taken_at)}. La toma volverá a quedar pendiente.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Quitar',
+          style: 'destructive',
+          onPress: async () => {
+            await undoTaken(d.id);
+            await rescheduleAll();
+            await load();
+          },
+        },
+      ],
+    );
 
   const byMed = useMemo(() => {
     const map = new Map<number, TakenDose[]>();
@@ -138,6 +163,13 @@ export default function History() {
                           <Text style={styles.muted}>Programada {formatTime(d.scheduled_at)}</Text>
                         </View>
                         <Text style={[styles.tag, { color: tint }]}>{p.label}</Text>
+                        <Pressable
+                          onPress={() => undo(d, item.name)}
+                          hitSlop={10}
+                          accessibilityLabel="Quitar esta toma"
+                        >
+                          <Ionicons name="trash-outline" size={19} color={colors.muted} />
+                        </Pressable>
                       </View>
                     );
                   })}

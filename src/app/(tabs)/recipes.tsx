@@ -135,8 +135,6 @@ export default function Recipes() {
         }
         renderItem={({ item }) => {
           const d = new Date(item.date);
-          const title = item.doctor || item.specialty || 'Cita médica';
-          const subtitle = item.doctor && item.specialty ? item.specialty : '';
           const extra = item.photos.length - THUMBS;
           return (
             <Pressable
@@ -150,19 +148,20 @@ export default function Recipes() {
                   <Text style={styles.dateYear}>{d.getFullYear()}</Text>
                 </View>
                 <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={styles.title} numberOfLines={1}>
-                    {title}
-                  </Text>
-                  {!!subtitle && (
-                    <Text style={styles.muted} numberOfLines={1}>
-                      {subtitle}
+                  {!item.doctor && !item.specialty && <Text style={styles.title}>Cita médica</Text>}
+                  {!!item.doctor && (
+                    <Text style={styles.line} numberOfLines={1}>
+                      <Text style={styles.lineLabel}>Médico: </Text>
+                      {item.doctor}
                     </Text>
                   )}
-                  <Text style={styles.count}>
-                    {item.photos.length
-                      ? `${item.photos.length} foto${item.photos.length > 1 ? 's' : ''}`
-                      : 'Sin fotos'}
-                  </Text>
+                  {!!item.specialty && (
+                    <Text style={styles.line} numberOfLines={1}>
+                      <Text style={styles.lineLabel}>Especialidad: </Text>
+                      {item.specialty}
+                    </Text>
+                  )}
+                  <Text style={styles.count}>Imágenes de recetas ({item.photos.length})</Text>
                   {item.medications.length > 0 && (
                     <View style={styles.medRow}>
                       {item.medications.map((m) => (
@@ -253,6 +252,8 @@ const createStyles = (c: Palette, isDark: boolean) =>
     dateDay: { fontSize: 24, fontWeight: '800', color: c.primary, lineHeight: 28 },
     dateMonth: { fontSize: 12, fontWeight: '800', color: c.primary },
     dateYear: { fontSize: 11, color: c.muted },
+    line: { fontSize: 15, fontWeight: '700', color: c.text },
+    lineLabel: { fontWeight: '500', color: c.muted },
     title: { fontSize: 18, fontWeight: '800', color: c.text },
     muted: { fontSize: 14, color: c.muted },
     count: { fontSize: 13, fontWeight: '700', color: c.primary, marginTop: 2 },
