@@ -25,13 +25,13 @@ export type Palette = {
 };
 
 const light: Palette = {
-  bg: '#F2F6F5',
+  bg: '#F1F5FA',
   surface: '#FFFFFF',
-  surfaceAlt: '#EAF1F0',
-  primary: '#0F766E',
-  primarySoft: '#D5F2EE',
+  surfaceAlt: '#E6EEF8',
+  primary: '#0B5FB0',
+  primarySoft: '#DBEAFB',
   onPrimary: '#FFFFFF',
-  header: '#0F766E',
+  header: '#0B5FB0',
   onHeader: '#FFFFFF',
   accent: '#F59E0B',
   danger: '#DC2626',
@@ -41,17 +41,17 @@ const light: Palette = {
   success: '#16A34A',
   text: '#0F172A',
   muted: '#64748B',
-  border: '#E2E8F0',
+  border: '#DCE5F0',
 };
 
 const dark: Palette = {
-  bg: '#0A1110',
-  surface: '#131C1B',
-  surfaceAlt: '#1B2827',
-  primary: '#2DD4BF',
-  primarySoft: '#123530',
-  onPrimary: '#042F2B',
-  header: '#0B3F3B',
+  bg: '#0A0F1A',
+  surface: '#121A29',
+  surfaceAlt: '#1A2538',
+  primary: '#60A5FA',
+  primarySoft: '#14294A',
+  onPrimary: '#06223F',
+  header: '#0B2F57',
   onHeader: '#FFFFFF',
   accent: '#FBBF24',
   danger: '#F87171',
@@ -61,7 +61,7 @@ const dark: Palette = {
   success: '#4ADE80',
   text: '#F1F5F9',
   muted: '#94A3B8',
-  border: '#263534',
+  border: '#25324A',
 };
 
 type ThemeValue = {

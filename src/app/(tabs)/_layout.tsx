@@ -27,7 +27,9 @@ function TabBar({ state, descriptors, emitter, navigateToTab, insets }: BottomTa
           backgroundColor: colors.surface,
           borderTopWidth: 1,
           borderTopColor: colors.border,
-          paddingBottom: Math.max(insets.bottom - 14, 4),
+          // Con navegación por gestos el inset es pequeño y debe respetarse entero; con botones (inset grande)
+          // se recorta un poco para ganar espacio.
+          paddingBottom: insets.bottom >= 40 ? insets.bottom - 14 : insets.bottom,
         }}
       >
         {state.routes.map((route, i) => {

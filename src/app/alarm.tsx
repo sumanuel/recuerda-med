@@ -6,6 +6,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, Vibration, View, useWindowDimensions } from 'react-native';
+import { AdBanner } from '../components/AdBanner';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../components/Button';
 import { getDose, getNextDose, markTaken, snoozeDose, type DoseWithMed } from '../db/repo';
 import { rescheduleAll, setActiveAlarmDose } from '../lib/notifications';
@@ -23,6 +25,7 @@ export default function Alarm() {
   const photoSize = Math.min(width - 48, 340);
   const styles = useStyles(createStyles);
   const { colors, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
 
   useKeepAwake();
   const player = useAudioPlayer(alarmSound);
@@ -185,6 +188,11 @@ export default function Alarm() {
   }
 
   return (
+    <View style={styles.screen}>
+      {/* Arriba y lejos de los botones, para evitar toques accidentales sobre el anuncio. */}
+      <View style={{ paddingTop: insets.top, backgroundColor: colors.surface }}>
+        <AdBanner />
+      </View>
     <ScrollView contentContainerStyle={[styles.container, styles.center]}>
       {statusBar}
       <View style={styles.kickerPill}>
@@ -215,11 +223,13 @@ export default function Alarm() {
         style={styles.fullWidth}
       />
     </ScrollView>
+    </View>
   );
 }
 
 const createStyles = (c: Palette, isDark: boolean) =>
   StyleSheet.create({
+    screen: { flex: 1, backgroundColor: c.bg },
     container: { flexGrow: 1, backgroundColor: c.bg, padding: 24, gap: 14 },
     center: { alignItems: 'center', justifyContent: 'center' },
     kickerPill: {
