@@ -27,7 +27,7 @@ function TabBar({ state, descriptors, emitter, navigateToTab, insets }: BottomTa
           backgroundColor: colors.surface,
           borderTopWidth: 1,
           borderTopColor: colors.border,
-          paddingBottom: insets.bottom,
+          paddingBottom: Math.max(insets.bottom - 14, 4),
         }}
       >
         {state.routes.map((route, i) => {
@@ -46,31 +46,31 @@ function TabBar({ state, descriptors, emitter, navigateToTab, insets }: BottomTa
                   onPress={() => router.push('/medication/form')}
                   accessibilityRole="button"
                   accessibilityLabel="Agregar medicamento"
-                  style={{ flex: 1, alignItems: 'center', paddingTop: 6, paddingBottom: 6, gap: 2 }}
+                  style={{ flex: 1, alignItems: 'center', paddingTop: 3, paddingBottom: 0, gap: 0 }}
                 >
                   <View
                     style={{
-                      width: 38,
-                      height: 38,
-                      borderRadius: 19,
+                      width: 28,
+                      height: 28,
+                      borderRadius: 14,
                       backgroundColor: colors.primary,
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}
                   >
-                    <Ionicons name="add" size={26} color={colors.onPrimary} />
+                    <Ionicons name="add" size={22} color={colors.onPrimary} />
                   </View>
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: colors.muted }}>Agregar</Text>
+                  <Text style={{ fontSize: 11, fontWeight: '600', color: colors.muted }}>Agregar</Text>
                 </Pressable>
               )}
               <Pressable
                 onPress={onPress}
                 accessibilityRole="button"
                 accessibilityState={{ selected: focused }}
-                style={{ flex: 1, alignItems: 'center', paddingTop: 8, paddingBottom: 6, gap: 2 }}
+                style={{ flex: 1, alignItems: 'center', paddingTop: 3, paddingBottom: 0, gap: 0 }}
               >
-                <Ionicons name={focused ? icon.on : icon.off} size={24} color={color} />
-                <Text style={{ fontSize: 12, fontWeight: '600', color }}>{title}</Text>
+                <Ionicons name={focused ? icon.on : icon.off} size={22} color={color} />
+                <Text style={{ fontSize: 11, fontWeight: '600', color }}>{title}</Text>
               </Pressable>
             </Fragment>
           );

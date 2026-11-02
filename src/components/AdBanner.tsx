@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { BANNER_UNIT_ID, loadAds } from '../lib/ads';
 import { useTheme } from '../lib/theme';
 
-/** Banner adaptable al pie de las pestañas. No muestra nada en Expo Go ni si falla la carga. */
+/** Banner estándar (320x50) al pie de las pestañas. No muestra nada en Expo Go ni si falla la carga. */
 export function AdBanner() {
   const { colors } = useTheme();
   const [failed, setFailed] = useState(false);
@@ -15,7 +15,7 @@ export function AdBanner() {
     <View style={[styles.box, { backgroundColor: colors.surface }]}>
       <BannerAd
         unitId={BANNER_UNIT_ID || TestIds.BANNER}
-        size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
+        size={BannerAdSize.BANNER}
         requestOptions={{ requestNonPersonalizedAdsOnly: true }}
         onAdFailedToLoad={() => setFailed(true)}
       />
