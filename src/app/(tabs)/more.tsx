@@ -2,18 +2,21 @@ import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState, type ReactNode } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { setSetting } from '../../db/repo';
 import { ALARM_TESTED_SETTING } from '../../lib/guide';
 import { Logo } from '../../components/Logo';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import {
+  getAlarmDiagnostics,
   hasExactAlarmPermission,
   requestExactAlarmPermission,
   rescheduleAll,
   scheduleTestAlarm,
+  type AlarmDiagnostics,
 } from '../../lib/notifications';
 import { useStyles, useTheme, type Palette, type ThemeMode } from '../../lib/theme';
+import { formatDateTime } from '../../lib/time';
 
 const MODES: { value: ThemeMode; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { value: 'system', label: 'Sistema', icon: 'phone-portrait-outline' },
@@ -25,10 +28,12 @@ export default function More() {
   const styles = useStyles(createStyles);
   const { colors, mode, setMode } = useTheme();
   const [exactOk, setExactOk] = useState(true);
+  const [diag, setDiag] = useState<AlarmDiagnostics | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       hasExactAlarmPermission().then(setExactOk);
+      getAlarmDiagnostics().then(setDiag).catch(() => {});
     }, []),
   );
 
@@ -105,6 +110,53 @@ export default function More() {
               setSetting(ALARM_TESTED_SETTING, '1').catch(() => {});
               Alert.alert('Prueba programada', 'Sonará en 10 segundos. Minimiza la app o bloquea el teléfono.');
             })}
+          </>,
+        )}
+
+        {section(
+          'Diagnóstico de alarmas',
+          <>
+            {diag &&
+              (
+                [
+                  ['Notificaciones permitidas', diag.notifications],
+                  ['Alarmas exactas', diag.exact],
+                  ['Canal con sonido de alarma', diag.channelOk],
+                ] as const
+              ).map(([label, ok]) => (
+                <View key={label}>
+                  {row(
+                    ok ? 'checkmark-circle-outline' : 'alert-circle-outline',
+                    label,
+                    ok ? 'Correcto' : 'Revisa este ajuste',
+                  )}
+                  <View style={styles.divider} />
+                </View>
+              ))}
+            {diag &&
+              row(
+                'alarm-outline',
+                `Alarmas programadas: ${diag.scheduled}`,
+                diag.nextAt ? `Próxima: ${formatDateTime(diag.nextAt)}` : 'No hay ninguna programada',
+              )}
+            <View style={styles.divider} />
+            {row('settings-outline', 'Ajustes de la app', 'Notificaciones, inicio automático y permisos', () =>
+              Linking.openSettings(),
+            )}
+            {Platform.OS === 'android' && (
+              <>
+                <View style={styles.divider} />
+                {row(
+                  'battery-charging-outline',
+                  'Ahorro de batería',
+                  'Pon RecuerdaMed en "Sin restricciones" o "No optimizar"',
+                  () =>
+                    Linking.sendIntent('android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS').catch(() =>
+                      Linking.openSettings(),
+                    ),
+                )}
+              </>
+            )}
           </>,
         )}
 

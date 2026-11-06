@@ -62,7 +62,7 @@ const SLIDES: Slide[] = [
     text: 'Algunos teléfonos frenan las alarmas para ahorrar batería. Dos ajustes lo evitan.',
     points: [
       'Concede "Alarmas y recordatorios" cuando la app lo pida',
-      'En Xiaomi, Samsung y similares: batería "Sin restricciones" para RecuerdaMed',
+      'En Xiaomi, Samsung y similares: batería "Sin restricciones" e "Inicio automático" activado para RecuerdaMed',
       'Prueba la alarma desde Más > Probar alarma',
     ],
   },

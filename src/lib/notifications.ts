@@ -86,6 +86,37 @@ export async function requestExactAlarmPermission() {
   if (Platform.OS === 'android') await Notifications.requestExactAlarmPermissionsAsync();
 }
 
+export type AlarmDiagnostics = {
+  notifications: boolean;
+  exact: boolean;
+  /** Canal con sonido propio e importancia máxima (solo Android). */
+  channelOk: boolean;
+  scheduled: number;
+  nextAt: number | null;
+};
+
+/** Estado real de las alarmas en el sistema, para saber si Android las conservó. */
+export async function getAlarmDiagnostics(): Promise<AlarmDiagnostics> {
+  const [perm, exact, scheduled, channel] = await Promise.all([
+    Notifications.getPermissionsAsync(),
+    hasExactAlarmPermission(),
+    Notifications.getAllScheduledNotificationsAsync(),
+    Platform.OS === 'android' ? Notifications.getNotificationChannelAsync(CHANNEL_ID) : Promise.resolve(null),
+  ]);
+  const times = scheduled
+    .map((n) => (n.trigger as { value?: number } | null)?.value)
+    .filter((v): v is number => typeof v === 'number');
+  return {
+    notifications: perm.granted,
+    exact,
+    channelOk:
+      Platform.OS !== 'android' ||
+      (!!channel && channel.importance >= Notifications.AndroidImportance.HIGH && channel.sound !== null),
+    scheduled: scheduled.length,
+    nextAt: times.length ? Math.min(...times) : null,
+  };
+}
+
 /** Aviso de prueba en `seconds` s, para comprobar permisos y sonido sin esperar una dosis. */
 export async function scheduleTestAlarm(seconds = 10) {
   await Notifications.scheduleNotificationAsync({
