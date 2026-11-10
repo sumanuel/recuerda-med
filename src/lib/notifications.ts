@@ -5,13 +5,14 @@ import { AppState, Platform } from 'react-native';
 import { listUpcomingDoses, snoozeDose } from '../db/repo';
 import { MINUTE } from './time';
 
-const CHANNEL_ID = 'medication-alarm-v3';
+const CHANNEL_ID = 'medication-alarm-v4';
 // Un canal no se puede modificar tras crearse; v1 y v2 pudieron quedar sin sonido.
-const OLD_CHANNEL_IDS = ['medication-alarm-v1', 'medication-alarm-v2'];
+const OLD_CHANNEL_IDS = ['medication-alarm-v1', 'medication-alarm-v2', 'medication-alarm-v3'];
 const CATEGORY_ID = 'dose';
 const ACTION_SNOOZE = 'snooze';
 const ACTION_TAKEN = 'taken';
-const SOUND_FILE = 'alarm.wav';
+// Sonido de ~25 s para el aviso del sistema (alarm.wav, de 2 s, lo reproduce en bucle la pantalla de alarma).
+const SOUND_FILE = 'alarm-long.wav';
 
 // iOS admite como máximo 64 notificaciones locales pendientes.
 const MAX_SCHEDULED = 60;

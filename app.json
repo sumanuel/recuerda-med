@@ -48,7 +48,8 @@
         {
           "color": "#0B5FB0",
           "sounds": [
-            "./assets/alarm.wav"
+            "./assets/alarm.wav",
+            "./assets/alarm-long.wav"
           ]
         }
       ],
