@@ -13,7 +13,7 @@ const CATEGORY_ID = 'dose';
 const ACTION_SNOOZE = 'snooze';
 const ACTION_TAKEN = 'taken';
 // Sonido de ~25 s para el aviso del sistema (alarm.wav, de 2 s, lo reproduce en bucle la pantalla de alarma).
-const SOUND_FILE = 'alarm-long.wav';
+const SOUND_FILE = 'alarm_long.wav';
 
 // iOS admite como máximo 64 notificaciones locales pendientes.
 const MAX_SCHEDULED = 60;
