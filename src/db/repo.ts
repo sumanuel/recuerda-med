@@ -264,6 +264,12 @@ export async function markTaken(id: number, redefine: boolean, takenAt = Date.no
   });
 }
 
+/** Corrige la hora real de una toma ya registrada (no cambia los horarios programados). */
+export async function updateTakenAt(id: number, takenAt: number): Promise<void> {
+  const db = await getDb();
+  await db.runAsync("UPDATE doses SET taken_at = ? WHERE id = ? AND status = 'taken'", takenAt, id);
+}
+
 /** Deshace una toma registrada por error: vuelve a quedar pendiente. */
 export async function undoTaken(id: number): Promise<void> {
   const db = await getDb();

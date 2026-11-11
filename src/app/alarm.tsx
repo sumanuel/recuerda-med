@@ -5,7 +5,7 @@ import { useKeepAwake } from 'expo-keep-awake';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, Vibration, View, useWindowDimensions } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, Vibration, View, useWindowDimensions } from 'react-native';
 import { AdBanner } from '../components/AdBanner';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../components/Button';
@@ -107,6 +107,12 @@ export default function Alarm() {
     };
   }, [step, player]);
 
+  /** Vuelve atrás sin registrar nada: a la alarma si venía de ella, o al inicio si venía de "Tomar ahora". */
+  const goBack = () => {
+    if (ask === '1') close();
+    else setStep('ring');
+  };
+
   const onSnooze = async () => {
     setBusy(true);
     stopAlarm();
@@ -165,6 +171,16 @@ export default function Alarm() {
   if (step === 'ask') {
     const redefinedNext = next ? next.scheduled_at + (takenAt - dose.scheduled_at) : 0;
     return (
+      <View style={styles.screen}>
+        <Pressable
+          onPress={goBack}
+          style={[styles.back, { marginTop: insets.top }]}
+          hitSlop={8}
+          accessibilityLabel="Volver"
+        >
+          <Ionicons name="arrow-back" size={22} color={colors.primary} />
+          <Text style={styles.backText}>Volver</Text>
+        </Pressable>
       <ScrollView contentContainerStyle={[styles.container, styles.center]}>
         {statusBar}
         <Ionicons name="checkmark-circle" size={72} color={colors.success} />
@@ -209,6 +225,7 @@ export default function Alarm() {
         </View>
         )}
       </ScrollView>
+      </View>
     );
   }
 
@@ -255,6 +272,8 @@ export default function Alarm() {
 const createStyles = (c: Palette, isDark: boolean) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: c.bg },
+    back: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 12, alignSelf: 'flex-start' },
+    backText: { fontSize: 16, fontWeight: '700', color: c.primary },
     container: { flexGrow: 1, backgroundColor: c.bg, padding: 24, gap: 14 },
     center: { alignItems: 'center', justifyContent: 'center' },
     kickerPill: {

@@ -2,10 +2,19 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Button } from '../../components/Button';
+import { DateTimeField } from '../../components/DateTimeField';
 import { ProgressBar } from '../../components/ProgressBar';
 import { ScreenHeader } from '../../components/ScreenHeader';
-import { listMedications, listTakenDoses, undoTaken, type MedicationSummary, type TakenDose } from '../../db/repo';
+import {
+  listMedications,
+  listTakenDoses,
+  undoTaken,
+  updateTakenAt,
+  type MedicationSummary,
+  type TakenDose,
+} from '../../db/repo';
 import { rescheduleAll } from '../../lib/notifications';
 import { useStyles, useTheme, type Palette } from '../../lib/theme';
 import { DAY, MINUTE, formatInterval, formatShortDate, formatTime } from '../../lib/time';
@@ -48,6 +57,21 @@ export default function History() {
       };
     }, []),
   );
+
+  const [editing, setEditing] = useState<{ dose: TakenDose; name: string } | null>(null);
+  const [editAt, setEditAt] = useState(0);
+
+  const startEdit = (dose: TakenDose, name: string) => {
+    setEditAt(dose.taken_at);
+    setEditing({ dose, name });
+  };
+
+  const saveEdit = async () => {
+    if (!editing) return;
+    await updateTakenAt(editing.dose.id, Math.min(editAt, Date.now()));
+    setEditing(null);
+    await load();
+  };
 
   const undo = (d: TakenDose, name: string) =>
     Alert.alert(
@@ -157,19 +181,27 @@ export default function History() {
                       <View key={d.id} style={styles.row}>
                         <View style={[styles.dot, { backgroundColor: tint }]} />
                         <View style={{ flex: 1 }}>
-                          <Text style={styles.rowTitle}>
-                            {formatShortDate(d.taken_at)} · {formatTime(d.taken_at)}
-                          </Text>
+                          <Text style={styles.rowTitle}>{formatShortDate(d.taken_at)}</Text>
+                          <Text style={styles.rowTime}>{formatTime(d.taken_at)}</Text>
                           <Text style={styles.muted}>Programada {formatTime(d.scheduled_at)}</Text>
                         </View>
                         <Text style={[styles.tag, { color: tint }]}>{p.label}</Text>
-                        <Pressable
-                          onPress={() => undo(d, item.name)}
-                          hitSlop={10}
-                          accessibilityLabel="Quitar esta toma"
-                        >
-                          <Ionicons name="trash-outline" size={19} color={colors.muted} />
-                        </Pressable>
+                        <View style={styles.actions}>
+                          <Pressable
+                            onPress={() => startEdit(d, item.name)}
+                            hitSlop={6}
+                            accessibilityLabel="Editar la hora de esta toma"
+                          >
+                            <Ionicons name="create-outline" size={20} color={colors.muted} />
+                          </Pressable>
+                          <Pressable
+                            onPress={() => undo(d, item.name)}
+                            hitSlop={6}
+                            accessibilityLabel="Quitar esta toma"
+                          >
+                            <Ionicons name="trash-outline" size={20} color={colors.muted} />
+                          </Pressable>
+                        </View>
                       </View>
                     );
                   })}
@@ -184,6 +216,24 @@ export default function History() {
           );
         }}
       />
+
+      <Modal visible={!!editing} transparent animationType="fade" onRequestClose={() => setEditing(null)}>
+        <View style={styles.backdrop}>
+          <View style={styles.sheet}>
+            <Text style={styles.sheetTitle}>Editar la hora de la toma</Text>
+            {editing && (
+              <Text style={styles.muted}>
+                {editing.name} · programada {formatShortDate(editing.dose.scheduled_at)} {formatTime(editing.dose.scheduled_at)}
+              </Text>
+            )}
+            <DateTimeField value={editAt} onChange={(t) => setEditAt(Math.min(t, Date.now()))} />
+            <View style={styles.sheetActions}>
+              <Button title="Cancelar" variant="ghost" onPress={() => setEditing(null)} style={{ flex: 1 }} />
+              <Button title="Guardar" icon="checkmark" onPress={saveEdit} style={{ flex: 1 }} />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -215,10 +265,16 @@ const createStyles = (c: Palette, isDark: boolean) =>
     thumbEmpty: { alignItems: 'center', justifyContent: 'center' },
     name: { fontSize: 17, fontWeight: '800', color: c.text },
     muted: { fontSize: 13, color: c.muted },
+    backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 24 },
+    sheet: { backgroundColor: c.surface, borderRadius: 20, padding: 20, gap: 12 },
+    sheetTitle: { fontSize: 18, fontWeight: '800', color: c.text },
+    sheetActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
+    actions: { gap: 18, alignItems: 'center', paddingVertical: 2 },
     list: { borderTopWidth: 1, borderTopColor: c.border, paddingHorizontal: 14, paddingVertical: 6 },
     row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
     dot: { width: 10, height: 10, borderRadius: 5 },
     rowTitle: { fontSize: 15, fontWeight: '700', color: c.text },
+    rowTime: { fontSize: 15, fontWeight: '600', color: c.text },
     tag: { fontSize: 13, fontWeight: '700' },
     more: { color: c.primary, fontWeight: '700', textAlign: 'center', paddingVertical: 10 },
     empty: { alignItems: 'center', paddingTop: 40, paddingHorizontal: 24, gap: 10 },
