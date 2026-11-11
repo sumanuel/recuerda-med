@@ -5,6 +5,7 @@ import { AppState, Platform } from 'react-native';
 import { listUpcomingDoses, snoozeDose } from '../db/repo';
 import { MINUTE } from './time';
 
+const inExpoGo = isRunningInExpoGo();
 const CHANNEL_ID = 'medication-alarm-v4';
 // Un canal no se puede modificar tras crearse; v1 y v2 pudieron quedar sin sonido.
 const OLD_CHANNEL_IDS = ['medication-alarm-v1', 'medication-alarm-v2', 'medication-alarm-v3'];
@@ -58,7 +59,6 @@ export async function setupNotifications(): Promise<boolean> {
     }
     // Expo Go no incluye alarm.wav (solo un development build lo empaqueta). Pedirlo allí deja el
     // canal mudo e inmodificable, así que en Expo Go se omite `sound` y se usa el sonido por defecto.
-    const inExpoGo = isRunningInExpoGo();
     await Notifications.setNotificationChannelAsync(
       CHANNEL_ID,
       inExpoGo ? channel : { ...channel, sound: SOUND_FILE },
@@ -101,8 +101,11 @@ export async function getAlarmDiagnostics(): Promise<AlarmDiagnostics> {
   const [perm, exact, scheduled, channel] = await Promise.all([
     Notifications.getPermissionsAsync(),
     hasExactAlarmPermission(),
-    Notifications.getAllScheduledNotificationsAsync(),
-    Platform.OS === 'android' ? Notifications.getNotificationChannelAsync(CHANNEL_ID) : Promise.resolve(null),
+    // Expo Go no soporta del todo estas consultas: un fallo no debe ocultar el resto del diagnóstico.
+    Notifications.getAllScheduledNotificationsAsync().catch(() => []),
+    Platform.OS === 'android' && !inExpoGo
+      ? Notifications.getNotificationChannelAsync(CHANNEL_ID).catch(() => null)
+      : Promise.resolve(null),
   ]);
   const times = scheduled
     .map((n) => (n.trigger as { value?: number } | null)?.value)
@@ -112,6 +115,7 @@ export async function getAlarmDiagnostics(): Promise<AlarmDiagnostics> {
     exact,
     channelOk:
       Platform.OS !== 'android' ||
+      inExpoGo ||
       (!!channel && channel.importance >= Notifications.AndroidImportance.HIGH && channel.sound !== null),
     scheduled: scheduled.length,
     nextAt: times.length ? Math.min(...times) : null,

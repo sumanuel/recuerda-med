@@ -3,6 +3,7 @@ import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Button } from '../../components/Button';
 import { ProgressBar } from '../../components/ProgressBar';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import {
@@ -26,7 +27,10 @@ const dayOf = (m: MedicationSummary) =>
 async function takeNow(m: MedicationSummary) {
   const id = await getNextPendingDoseId(m.id);
   if (!id) return;
-  Alert.alert('Tomar ahora', `Registrarás ${m.name} como tomada antes de que suene la alarma. En el siguiente paso puedes indicar la hora real en que la tomaste.`, [
+  const text = m.next_at
+    ? `Registrarás ${m.name} como tomada antes de que suene la alarma.`
+    : `Registrarás ${m.name} como tomada (la toma pendiente más antigua).`;
+  Alert.alert('Tomar ahora', `${text} En el siguiente paso puedes indicar la hora real en que la tomaste.`, [
     { text: 'Cancelar', style: 'cancel' },
     { text: 'Tomar ahora', onPress: () => router.push({ pathname: '/alarm', params: { doseId: String(id), ask: '1', pick: '1' } }) },
   ]);
@@ -165,26 +169,30 @@ export default function Home() {
             style={({ pressed }) => [styles.card, pressed && { opacity: 0.9 }]}
             onPress={() => router.push({ pathname: '/medication/form', params: { id: String(item.id) } })}
           >
-            {item.photo_uri ? (
-              <Image source={{ uri: item.photo_uri }} style={styles.thumb} contentFit="cover" />
-            ) : (
-              <View style={[styles.thumb, styles.thumbEmpty]}>
-                <Ionicons name="medical" size={30} color={colors.primary} />
+            <View style={styles.side}>
+              {item.photo_uri ? (
+                <Image source={{ uri: item.photo_uri }} style={styles.thumb} contentFit="cover" />
+              ) : (
+                <View style={[styles.thumb, styles.thumbEmpty]}>
+                  <Ionicons name="medical" size={30} color={colors.primary} />
+                </View>
+              )}
+              <View style={styles.everyChip}>
+                <Ionicons name="repeat" size={12} color={colors.primary} />
+                <Text style={[styles.chipText, { fontSize: 11 }]} numberOfLines={1}>
+                  Cada {formatInterval(item.interval_minutes)}
+                </Text>
               </View>
-            )}
+            </View>
             <View style={{ flex: 1, gap: 6 }}>
               <Text style={styles.name} numberOfLines={1}>
                 {item.name}
               </Text>
-              <View style={styles.dosageRow}>
-                <Text style={[styles.field, { flex: 1 }]} numberOfLines={1}>
+              {!!item.dosage && (
+                <Text style={styles.field} numberOfLines={1}>
                   {item.dosage}
                 </Text>
-                <View style={styles.chip}>
-                  <Ionicons name="repeat" size={13} color={colors.primary} />
-                  <Text style={styles.chipText}>Cada {formatInterval(item.interval_minutes)}</Text>
-                </View>
-              </View>
+              )}
               {item.overdue > 0 && (
                 <View style={styles.chips}>
                   <View style={[styles.chip, { backgroundColor: colors.dangerSoft }]}>
@@ -218,12 +226,6 @@ export default function Home() {
                 fill={colors.primary}
                 height={6}
               />
-              {!!item.next_at && (
-                <Pressable style={styles.takeNow} onPress={() => takeNow(item)} accessibilityLabel={`Tomar ${item.name} ahora`}>
-                  <Ionicons name="checkmark-circle-outline" size={16} color={colors.primary} />
-                  <Text style={styles.takeNowText}>Tomar ahora</Text>
-                </Pressable>
-              )}
               <View style={styles.cardFoot}>
                 <Text style={styles.next}>
                   {item.next_at ? `Próxima: ${formatDateTime(item.next_at)}` : item.overdue ? 'Toma pendiente' : 'Completado'}
@@ -232,6 +234,15 @@ export default function Home() {
                   {item.taken}/{item.total}
                 </Text>
               </View>
+              {(!!item.next_at || item.overdue > 0) && (
+                <Button
+                  title="Tomar ahora"
+                  icon="checkmark-circle-outline"
+                  variant="secondary"
+                  onPress={() => takeNow(item)}
+                  style={styles.takeNow}
+                />
+              )}
             </View>
           </Pressable>
         )}
@@ -269,21 +280,20 @@ const createStyles = (c: Palette, isDark: boolean) =>
     thumbEmpty: { alignItems: 'center', justifyContent: 'center' },
     name: { fontSize: 18, fontWeight: '800', color: c.text },
     field: { fontSize: 14, fontWeight: '600', color: c.text },
-    takeNow: {
+    takeNow: { paddingVertical: 11, marginTop: 4 },
+    side: { width: 76, gap: 8 },
+    everyChip: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 6,
-      borderWidth: 1.5,
-      borderColor: c.primary,
-      borderRadius: 10,
-      paddingVertical: 7,
-      marginTop: 2,
+      gap: 3,
+      backgroundColor: c.primarySoft,
+      borderRadius: 999,
+      paddingHorizontal: 4,
+      paddingVertical: 4,
     },
-    takeNowText: { fontSize: 14, fontWeight: '800', color: c.primary },
     fieldLabel: { fontSize: 14, fontWeight: '500', color: c.muted },
     muted: { fontSize: 13, color: c.muted },
-    dosageRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
     chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
     chip: {
       flexDirection: 'row',

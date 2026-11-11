@@ -84,16 +84,24 @@ export async function listMedications(now = Date.now()): Promise<MedicationSumma
   );
 }
 
-/** Próxima toma pendiente de un medicamento (la que aún no suena), para poder adelantarla. */
+/**
+ * Toma a registrar desde "Tomar ahora": la próxima que aún no suena (para adelantarla) o, si ya no
+ * quedan futuras, la pendiente más antigua (toma olvidada).
+ */
 export async function getNextPendingDoseId(medicationId: number, now = Date.now()): Promise<number | null> {
   const db = await getDb();
-  const row = await db.getFirstAsync<{ id: number }>(
+  const upcoming = await db.getFirstAsync<{ id: number }>(
     `SELECT id FROM doses WHERE medication_id = ? AND status = 'pending'
        AND COALESCE(snoozed_until, scheduled_at) > ?
      ORDER BY COALESCE(snoozed_until, scheduled_at) LIMIT 1`,
     medicationId, now,
   );
-  return row?.id ?? null;
+  if (upcoming) return upcoming.id;
+  const oldest = await db.getFirstAsync<{ id: number }>(
+    "SELECT id FROM doses WHERE medication_id = ? AND status = 'pending' ORDER BY scheduled_at LIMIT 1",
+    medicationId,
+  );
+  return oldest?.id ?? null;
 }
 
 /** Tomas registradas, más recientes primero. */
